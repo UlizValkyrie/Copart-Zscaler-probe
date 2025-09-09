@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zscaler RDP/SSH Connectivity Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        .protocol-selection {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+
+        .protocol-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .protocol-option:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .protocol-option.selected {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .protocol-option input[type="radio"] {
+            margin: 0;
+        }
+
+        .protocol-option label {
+            cursor: pointer;
+            font-weight: 500;
+            margin: 0;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .test-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            min-width: 120px;
+        }
+
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .test-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .results {
+            margin-top: 30px;
+        }
+
+        .test-results {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .test-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e1e5e9;
+        }
+
+        .test-item h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .test-item .status {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .test-item .status.success {
+            color: #28a745;
+        }
+
+        .test-item .status.fail {
+            color: #dc3545;
+        }
+
+        .test-item .status.timeout {
+            color: #ffc107;
+        }
+
+        .test-item .status.error {
+            color: #6c757d;
+        }
+
+        .test-item .status.pending {
+            color: #007bff;
+        }
+
+        .verdict {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 5px solid #007bff;
+        }
+
+        .verdict h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .verdict .result {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .verdict .explanation {
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #c3e6cb;
+        }
+
+        .protocol-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196f3;
+        }
+
+        .protocol-info h4 {
+            color: #1976d2;
+            margin-bottom: 8px;
+        }
+
+        .protocol-info p {
+            color: #424242;
+            margin: 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 Zscaler RDP/SSH Connectivity Tester</h1>
+            <p>Test RDP/SSH server connectivity through Zscaler ZPA policies</p>
+        </div>
+
+        <div class="input-section">
+            <div class="protocol-selection">
+                <div class="protocol-option selected" id="rdpOption">
+                    <input type="radio" id="rdp" name="protocol" value="rdp" checked>
+                    <label for="rdp">🖥️ Windows (RDP)</label>
+                </div>
+                <div class="protocol-option" id="sshOption">
+                    <input type="radio" id="ssh" name="protocol" value="ssh">
+                    <label for="ssh">🐧 Linux (SSH)</label>
+                </div>
+            </div>
+
+            <div class="protocol-info" id="protocolInfo">
+                <h4>Windows RDP Testing</h4>
+                <p>Tests port 3389 for Remote Desktop Protocol connectivity. Useful for Windows servers and workstations.</p>
+            </div>
+
+            <div class="input-group">
+                <input type="text" id="domainInput" placeholder="Enter server domain (e.g., server.company.com)" />
+                <button class="test-button" id="testButton" onclick="runTest()">Run Test</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Testing connectivity...</p>
+        </div>
+
+        <div class="results" id="results" style="display: none;">
+            <div class="test-results">
+                <div class="test-item">
+                    <h3>DNS Resolution</h3>
+                    <div class="status pending" id="dnsStatus">Pending</div>
+                </div>
+                <div class="test-item">
+                    <h3 id="servicePortLabel">RDP Port (3389)</h3>
+                    <div class="status pending" id="wsStatus">Pending</div>
+                </div>
+                <div class="test-item">
+                    <h3>Control Port (443)</h3>
+                    <div class="status pending" id="controlWsStatus">Pending</div>
+                </div>
+                <div class="test-item">
+                    <h3>Overall Verdict</h3>
+                    <div class="status pending" id="verdictStatus">Pending</div>
+                </div>
+            </div>
+
+            <div class="verdict" id="verdict">
+                <h3>Zscaler Policy Verdict</h3>
+                <div class="result" id="verdictResult">-</div>
+                <div class="explanation" id="verdictExplanation">-</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let testResults = {
+            dns: null,
+            service: null,
+            control: null
+        };
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function showResults(show) {
+            document.getElementById('results').style.display = show ? 'block' : 'none';
+        }
+
+        function updateStatus(elementId, status, text) {
+            const element = document.getElementById(elementId);
+            element.textContent = text;
+            element.className = `status ${status}`;
+        }
+
+        function updateProtocolInfo() {
+            const rdpSelected = document.getElementById('rdp').checked;
+            const protocolInfo = document.getElementById('protocolInfo');
+            const servicePortLabel = document.getElementById('servicePortLabel');
+            const domainInput = document.getElementById('domainInput');
+
+            if (rdpSelected) {
+                protocolInfo.innerHTML = `
+                    <h4>Windows RDP Testing</h4>
+                    <p>Tests port 3389 for Remote Desktop Protocol connectivity. Useful for Windows servers and workstations.</p>
+                `;
+                servicePortLabel.textContent = 'RDP Port (3389)';
+                domainInput.placeholder = 'Enter Windows server domain (e.g., server.company.com)';
+            } else {
+                protocolInfo.innerHTML = `
+                    <h4>Linux SSH Testing</h4>
+                    <p>Tests port 22 for Secure Shell connectivity. Useful for Linux servers and Unix systems.</p>
+                `;
+                servicePortLabel.textContent = 'SSH Port (22)';
+                domainInput.placeholder = 'Enter Linux server domain (e.g., server.company.com)';
+            }
+        }
+
+        function updateProtocolSelection() {
+            const rdpOption = document.getElementById('rdpOption');
+            const sshOption = document.getElementById('sshOption');
+            
+            if (document.getElementById('rdp').checked) {
+                rdpOption.classList.add('selected');
+                sshOption.classList.remove('selected');
+            } else {
+                rdpOption.classList.remove('selected');
+                sshOption.classList.add('selected');
+            }
+            
+            updateProtocolInfo();
+        }
+
+        async function runConnectivityTest(domain, protocol) {
+            try {
+                const response = await fetch('/api/test-connectivity', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ domain, protocol })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                throw new Error(`Test failed: ${error.message}`);
+            }
+        }
+
+        async function runTest() {
+            const domain = document.getElementById('domainInput').value.trim();
+            const protocol = document.querySelector('input[name="protocol"]:checked').value;
+            
+            if (!domain) {
+                alert('Please enter a domain name');
+                return;
+            }
+
+            // Reset UI
+            showLoading(true);
+            showResults(false);
+            document.getElementById('testButton').disabled = true;
+
+            // Reset status indicators
+            updateStatus('dnsStatus', 'pending', 'Testing...');
+            updateStatus('wsStatus', 'pending', 'Testing...');
+            updateStatus('controlWsStatus', 'pending', 'Testing...');
+            updateStatus('verdictStatus', 'pending', 'Testing...');
+
+            try {
+                console.log(`Running ${protocol.toUpperCase()} connectivity test for:`, domain);
+                const results = await runConnectivityTest(domain, protocol);
+                
+                // Update DNS status
+                if (results.tests.dns.success) {
+                    updateStatus('dnsStatus', 'success', 'Success');
+                } else {
+                    updateStatus('dnsStatus', 'fail', 'Failed');
+                }
+
+                // Update service port status
+                if (results.tests.service.success) {
+                    updateStatus('wsStatus', 'success', 'Connected');
+                } else if (results.tests.service.error === 'timeout') {
+                    updateStatus('wsStatus', 'timeout', 'Timeout');
+                } else if (results.tests.service.error === 'connection_refused') {
+                    updateStatus('wsStatus', 'error', 'Refused');
+                } else {
+                    updateStatus('wsStatus', 'fail', 'Failed');
+                }
+
+                // Update Control port status
+                if (results.tests.control.success) {
+                    updateStatus('controlWsStatus', 'success', 'Connected');
+                } else if (results.tests.control.error === 'timeout') {
+                    updateStatus('controlWsStatus', 'timeout', 'Timeout');
+                } else {
+                    updateStatus('controlWsStatus', 'fail', 'Failed');
+                }
+
+                // Update verdict
+                updateStatus('verdictStatus', 'success', 'Complete');
+                document.getElementById('verdictResult').textContent = results.verdict.verdict;
+                document.getElementById('verdictExplanation').innerHTML = `
+                    <p><strong>Explanation:</strong> ${results.verdict.explanation}</p>
+                    <p><strong>Recommendation:</strong> ${results.verdict.recommendation}</p>
+                `;
+
+                showResults(true);
+
+            } catch (error) {
+                console.error('Test failed:', error);
+                document.getElementById('results').innerHTML = `
+                    <div class="error">
+                        <h3>Test Failed</h3>
+                        <p>An error occurred during testing: ${error.message}</p>
+                    </div>
+                `;
+                showResults(true);
+            } finally {
+                showLoading(false);
+                document.getElementById('testButton').disabled = false;
+            }
+        }
+
+        // Event listeners
+        document.getElementById('rdp').addEventListener('change', updateProtocolSelection);
+        document.getElementById('ssh').addEventListener('change', updateProtocolSelection);
+
+        // Allow Enter key to trigger test
+        document.getElementById('domainInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                runTest();
+            }
+        });
+
+        // Initialize
+        updateProtocolSelection();
+    </script>
+</body>
+</html>
