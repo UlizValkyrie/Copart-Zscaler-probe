@@ -603,12 +603,13 @@
             });
         }
 
-        // Determine verdict based on test results and protocol
+        // CORRECTED Zscaler verdict logic
         function determineVerdict(dnsResult, pingResult, serviceResult, controlResult, protocol = 'rdp') {
             const dnsSuccess = dnsResult.success;
             const pingSuccess = pingResult.success;
             const serviceSuccess = serviceResult.success;
             const serviceTimeout = serviceResult.error === 'timeout';
+            const serviceRefused = serviceResult.error === 'connection_refused';
             const controlSuccess = controlResult.success;
             
             const serviceName = protocol === 'ssh' ? 'SSH' : 'RDP';
@@ -638,27 +639,37 @@
                 };
             }
 
+            // CORRECTED LOGIC: Connection refused means Zscaler allows it but service isn't running
+            if (serviceRefused && controlSuccess) {
+                return {
+                    verdict: `Zscaler allows ${serviceName} - Service not running`,
+                    explanation: `DNS resolves, ping works, and control channels work. Connection refused on ${serviceName} port means Zscaler allows the connection but the ${serviceName} service is not running on the target server.`,
+                    recommendation: `Zscaler policy allows ${serviceName} connections. Check if ${serviceName} service is running on the target server and if port ${servicePort} is configured correctly.`
+                };
+            }
+
+            // CORRECTED LOGIC: Timeout means Zscaler is blocking it
             if (serviceTimeout && controlSuccess) {
                 return {
-                    verdict: `Zscaler/Firewall blocking ${serviceName}`,
-                    explanation: `DNS resolves, ping works, and control channels work, but ${serviceName} port times out. This suggests Zscaler or firewall is specifically blocking ${serviceName} traffic while allowing other protocols.`,
-                    recommendation: `Check Zscaler application policies for ${serviceName} blocking. May need to whitelist ${serviceName} protocol or specific ports.`
+                    verdict: `Zscaler blocking ${serviceName}`,
+                    explanation: `DNS resolves, ping works, and control channels work, but ${serviceName} port times out. This indicates Zscaler is specifically blocking ${serviceName} traffic while allowing other protocols.`,
+                    recommendation: `Check Zscaler application policies for ${serviceName} blocking. You may need to whitelist ${serviceName} protocol or specific ports in your Zscaler policy.`
                 };
             }
 
             if (serviceTimeout && !controlSuccess) {
                 return {
                     verdict: "Indeterminate (could be server down)",
-                    explanation: `DNS resolves and ping works, but both ${serviceName} and control channels timeout. This could indicate server is down or specific services are not running.`,
-                    recommendation: "Verify server is running and accessible. Check if specific services are configured correctly."
+                    explanation: `DNS resolves and ping works, but both ${serviceName} and control channels timeout. This could indicate server is down or Zscaler is blocking all traffic to this host.`,
+                    recommendation: "Verify server is running and accessible. Check if Zscaler is blocking all traffic to this host."
                 };
             }
 
-            if (!serviceSuccess && controlSuccess) {
+            if (serviceRefused && !controlSuccess) {
                 return {
-                    verdict: `Likely ${serviceName} port reachable`,
-                    explanation: `${serviceName} port shows connection refused but control channel works and ping succeeds. This suggests the ${serviceName} port is reachable but may not be running ${serviceName} service or is filtered.`,
-                    recommendation: `Verify ${serviceName} service is running on the target server. Check if port ${servicePort} is configured correctly.`
+                    verdict: `Zscaler allows ${serviceName} - Service not running`,
+                    explanation: `${serviceName} port shows connection refused but control channel fails. This suggests Zscaler allows the connection but the ${serviceName} service is not running on the target server.`,
+                    recommendation: `Zscaler policy allows ${serviceName} connections. Verify ${serviceName} service is running on the target server and check if port ${servicePort} is configured correctly.`
                 };
             }
 
